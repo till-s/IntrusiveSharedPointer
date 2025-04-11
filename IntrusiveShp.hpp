@@ -200,7 +200,7 @@ public:
 		}
 		// just move over; no need to adjust the count
 		p_    = rhs.get();
-		rhs_p = nullptr;
+		rhs.p = nullptr;
 		
 #ifdef SHP_DEBUG
 		printf("operator=(Shp&&): %ld - %ld\n", use_count(), rhs.use_count());
