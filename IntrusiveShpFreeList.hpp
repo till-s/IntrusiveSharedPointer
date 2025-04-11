@@ -5,17 +5,35 @@
 
 #include <IntrusiveShp.hpp>
 
+// Intrusive shared pointer for objects managed by
+// a free list.
+
 namespace IntrusiveSmart {
 
 class FreeListBase;
 
+// Intrusive base for objects to be managed.
+// This class adds a 'next' pointer member so the
+// object can be enqueued on a list.
 class FreeListNode : public ShpBase {
 	friend class FreeListBase;
 private:
+	// pointer member union: 
+	//   - while the object is managed by a Shp the
+	//     u_.list_ member is used to hold a pointer
+	//     to the FreeList to which this object is to be
+	//     returned once unmanaged.
+	//   - while the object is not 'owned' by any Shp
+	//     the 'u_.next_' member is used for implementing
+	//     a linked list.
 	mutable union {
 		FreeListBase *list_;
 		FreeListNode *next_;
 	} u_;
+
+	// all the setters and getters for the pointer members
+	// must only be used while the object is not referenced
+	// by a Shp.
 
 	FreeListNode *next() const
 	{
@@ -50,9 +68,11 @@ private:
 	}
 
 protected:
+	// unmanage() returns the object to the associated free list
 	virtual void unmanage(const Key &) const override;
 };
 
+// Base class for a free list holding FreeListNodes.
 class FreeListBase {
 private:
 
@@ -61,6 +81,9 @@ private:
 	std::atomic<unsigned> avail_{0};
 
 protected:
+
+	// Get head from the free-list as a plain/raw (non-shared)
+	// pointer.
 	virtual FreeListNode *getRaw()
 	{
 		std::unique_lock l( mtx_ );
@@ -74,6 +97,10 @@ protected:
 	}
 
 public:
+	// Enqueue object on the free list.
+	// Note that new objects (as created with 'new'
+	// have a reference count of zero and may simply
+	// be added to the free list).
 	virtual void put(FreeListNode *p)
 	{
 		std::unique_lock l( mtx_ );
@@ -84,11 +111,18 @@ public:
 
 	virtual ~FreeListBase()
 	{
+		// by default we delete all the objects on
+		// the list. A subclass can define their
+		// own destructor; since that one is executed
+		// first this classes' destructor may find
+		// the list already emptied.
 		while ( auto p = getRaw() ) {
 			delete p;
 		}
 	}
 
+	// obtain a new shared pointer-managed object
+	// from the list.
 	template <typename T>
 	Shp<T>
 	get()
