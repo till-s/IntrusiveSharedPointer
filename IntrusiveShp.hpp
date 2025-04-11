@@ -9,6 +9,9 @@
 #include <cstdio>
 #endif
 
+// Simple intrusive shared pointer; the control block 'ShpBase'
+// should be derived from by a managed object.
+
 namespace IntrusiveSmart {
 
 class ShpBase {
@@ -25,6 +28,9 @@ protected:
 
 private:
 
+	// declare mutable; the reference-count is not conceptually
+	// 'part' of the 'real' object. We must manipulate it even
+	// in the case of a 'const' object.
 	mutable std::atomic<int> refcnt_{0};
 
 	int incRef() const {
@@ -40,6 +46,9 @@ private:
 	}
 
 public:
+	// unmanage may be used to
+	//  - reset an object for reuse
+	//  - hand it over to an object manager, e.g., a free list.
 	virtual void unmanage(const Key &) const {
 		delete this;
 	}
@@ -52,11 +61,13 @@ public:
 	}
 #endif
 
+	// for testing/debugging
 	long use_count() const
 	{
 		return refcnt_.load();
 	}
 
+	// must have virtual destructor!
 	virtual ~ShpBase()
 	{
 	}
@@ -71,6 +82,7 @@ public:
 
 	Shp() : p_(nullptr) {}
 
+	// construct a new shared pointer
 	Shp(T *p) : p_(p) {
 		if ( p_ ) {
 			p_->incRef();
@@ -95,6 +107,14 @@ private:
 
 	struct dummy_tag {};
 
+	// copy constructor; use a dummy argument so
+	// that we may reuse a single template for the
+	// templated- and non-templated versions below.
+	// If we dont explicitly provide Shp(const Shp &rhs)
+	// (i.e., a non-templated variant) then the compiler
+	// assumes the default constructor has been deleted
+	// and does *not* use the templated version.
+
 	template <typename U>
 	Shp(const Shp<U> &rhs, struct dummy_tag)
 	: p_(rhs.get())
@@ -107,9 +127,11 @@ private:
 #endif
 	}
 
+	// Same for the move constructor.
 	template <typename U>
 	Shp(Shp<U> &&rhs, struct dummy_tag)
 	{
+		// just take over from rhs; no need to adjust reference count
 		p_ = rhs.get();
 		rhs.p_ = nullptr;
 #ifdef SHP_DEBUG
@@ -144,12 +166,14 @@ public:
 	template <typename U>
 	Shp & operator=(const Shp<U> &rhs)
 	{
-		auto old = p_;
+		// we can decrement 'this' right away - if both
+		// 'this' and 'rhs' reference the same object then
+		// 'this' cannot drop to zero even if we decrement first.
+		if ( p_ ) {
+			p_->decRef();
+		}
 		if ( (p_ = rhs.get()) ) {
 			p_->incRef();
-		}
-		if ( old ) {
-			old->decRef();
 		}
 #ifdef SHP_DEBUG
 		printf("operator=(Shp&): %ld - %ld\n", use_count(), rhs.use_count());
@@ -157,6 +181,8 @@ public:
 		return *this;
 	}
 
+	// must provide a non-templated version; the compiler
+	// won't use a the template if U==T.
 	Shp & operator=(const Shp &rhs)
 	{
 		return operator=<T>(rhs);
@@ -166,13 +192,16 @@ public:
 	Shp & operator=(Shp<U> &&rhs)
 	{
 		T *p;
-		// no-op if both are nullptr or both reference the same object
-		if ( (p = get()) != (p_ = rhs.get()) ) {
-			if ( p ) {
-				p->decRef();
-			}
-			rhs.p_ = nullptr;
+		// if 'this' and 'rhs' reference the same object
+		// then the count is at least 2 and can not drop
+		// to zero if we decrement first.
+		if ( p_ ) {
+			p_->decRef();
 		}
+		// just move over; no need to adjust the count
+		p_    = rhs.get();
+		rhs_p = nullptr;
+		
 #ifdef SHP_DEBUG
 		printf("operator=(Shp&&): %ld - %ld\n", use_count(), rhs.use_count());
 #endif
@@ -204,6 +233,7 @@ public:
 
 	void swap(Shp &rhs)
 	{
+		// reference counts don't change
 		auto tmp = rhs.p_;
 		rhs.p_   = p_;
 		p_       = tmp;
