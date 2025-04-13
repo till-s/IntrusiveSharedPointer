@@ -69,7 +69,7 @@ private:
 
 protected:
 	// unmanage() returns the object to the associated free list
-	virtual void unmanage(const Key &) const override;
+	virtual void unmanage(const Key &) override;
 };
 
 // Base class for a free list holding FreeListNodes.

@@ -40,7 +40,7 @@ private:
 	int decRef() const {
 		int rv = refcnt_.fetch_sub(1);
 		if ( 1 == rv ) {
-			unmanage(Key());
+			const_cast<ShpBase*>(this)->unmanage(Key());
 		}
 		return rv;
 	}
@@ -49,7 +49,7 @@ public:
 	// unmanage may be used to
 	//  - reset an object for reuse
 	//  - hand it over to an object manager, e.g., a free list.
-	virtual void unmanage(const Key &) const {
+	virtual void unmanage(const Key &) {
 		delete this;
 	}
 
