@@ -244,16 +244,18 @@ public:
 		return !!p_;
 	}
 
-	T *operator->() {
+	T *operator->() const
+	{
 		return p_;
 	}
 
-	T &operator*() {
+	T &operator*() const
+	{
 		return *p_;
 	}
 
 #ifdef SHP_DEBUG
-	void pr()
+	void pr() const
 	{
 		printf("%p: %ld\n", p_, use_count());
 	}
