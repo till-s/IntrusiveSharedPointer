@@ -3,7 +3,7 @@
 #include <type_traits>
 #include <atomic>
 
-#undef  SHP_DEBUG
+#undef SHP_DEBUG
 
 #ifdef SHP_DEBUG
 #include <cstdio>
@@ -199,8 +199,8 @@ public:
 			p_->decRef();
 		}
 		// just move over; no need to adjust the count
-		p_    = rhs.get();
-		rhs.p = nullptr;
+		p_     = rhs.get();
+		rhs.p_ = nullptr;
 		
 #ifdef SHP_DEBUG
 		printf("operator=(Shp&&): %ld - %ld\n", use_count(), rhs.use_count());
