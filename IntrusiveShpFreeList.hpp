@@ -51,14 +51,6 @@ private:
 		u_.next_ = p;
 	}
 
-	FreeListBase *list() const
-	{
-		if ( use_count() ) {
-			throw std::bad_alloc();
-		}
-		return u_.list_;
-	}
-
 	void setList(FreeListBase *p) const
 	{
 		if ( use_count() ) {
@@ -70,6 +62,14 @@ private:
 protected:
 	// unmanage() returns the object to the associated free list
 	virtual void unmanage(const Key &) override;
+
+	FreeListBase *list() const
+	{
+		if ( 0 == use_count() ) {
+			throw std::bad_alloc();
+		}
+		return u_.list_;
+	}
 };
 
 // Base class for a free list holding FreeListNodes.
